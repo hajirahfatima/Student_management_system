@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management System</title>
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f3f0f7;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #4a2574;
+            margin-bottom: 20px;
+        }
+
+        .alert-box {
+            display: none;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .alert-success {
+            background-color: #e8daef;
+            color: #512e5f;
+            border: 1px solid #d2b4de;
+        }
+
+        .alert-error {
+            background-color: #fadbd8;
+            color: #78281f;
+            border: 1px solid #f5b7b1;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #dcd0e6;
+            margin-bottom: 25px;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            color: #4a2574;
+            font-size: 18px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #4a2574;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-save {
+            background-color: #6c3483;
+            color: white;
+        }
+
+        .btn-cancel {
+            background-color: #887799;
+            color: white;
+            display: none;
+            margin-left: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border: 1px solid #dcd0e6;
+            border-radius: 6px;
+        }
+
+        th,
+        td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #f0e6f6;
+        }
+
+        th {
+            background-color: #4a2574;
+            color: white;
+        }
+
+        .btn-edit {
+            background-color: #8e44ad;
+            color: white;
+            padding: 5px 10px;
+        }
+
+        .btn-delete {
+            background-color: #c0392b;
+            color: white;
+            padding: 5px 10px;
+        }
+
+        /* Simple delete confirmation modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Student Management System</h1>
+
+        <div id="alert" class="alert-box"></div>
+
+        <div class="card">
+            <h2 id="form-title">Add Student</h2>
+            <form id="student-form">
+                <input type="hidden" id="student-id">
+
+                <div class="form-group">
+                    <label>Student Name</label>
+                    <input type="text" id="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Course</label>
+                    <input type="text" id="course" required>
+                </div>
+
+                <button type="submit" id="btn-save" class="btn-save">Save Student</button>
+                <button type="button" id="btn-cancel" class="btn-cancel" onclick="resetForm()">Cancel</button>
+            </form>
+        </div>
+
+        <h2 style="color: #4a2574;">Student List</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Course</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <tr>
+                    <td colspan="5">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div id="delete-modal" class="modal">
+        <div class="modal-content">
+            <p>Are you sure you want to delete this student?</p>
+            <button class="btn-delete" onclick="deleteStudent()">Delete</button>
+            <button class="btn-cancel" style="display:inline-block;" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://yifhtxpbyaqbbpelaauf.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpZmh0eHBieWFxYmJwZWxhYXVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNDUwMDEsImV4cCI6MjEwNTcyMTAwMX0.D0IKEBi8FJen2-sta5oksk-vS6hrKpVI4xOsjY7CgFU";
+
+        const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let deleteId = null;
+
+        // Fetch students when page loads
+        window.onload = function () {
+            loadStudents();
+        };
+
+        // Read (Fetch all records)
+        async function loadStudents() {
+            const { data, error } = await db
+                .from('std_management_system')
+                .select('*')
+                .order('id', { ascending: true });
+
+            if (error) {
+                showAlert("Error loading students: " + error.message, false);
+                return;
+            }
+
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">No students found.</td></tr>';
+                return;
+            }
+
+            for (let i = 0; i < data.length; i++) {
+                let student = data[i];
+                let row = `
+                    <tr>
+                        <td>${student.id}</td>
+                        <td>${student.name}</td>
+                        <td>${student.email}</td>
+                        <td>${student.course}</td>
+                        <td>
+                            <button class="btn-edit" onclick="editStudent(${student.id}, '${student.name}', '${student.email}', '${student.course}')">Edit</button>
+                            <button class="btn-delete" onclick="confirmDelete(${student.id})">Delete</button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            }
+        }
+
+        // Form Submit handler for Create & Update
+        document.getElementById('student-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const id = document.getElementById('student-id').value;
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const course = document.getElementById('course').value;
+
+            // Simple Email Validation
+            if (!email.includes('@')) {
+                showAlert("Please enter a valid email address.", false);
+                return;
+            }
+
+            if (id) {
+                // Update Student
+                const { error } = await db
+                    .from('std_management_system')
+                    .update({ name: name, email: email, course: course })
+                    .eq('id', id);
+
+                if (error) {
+                    showAlert("Failed to update: " + error.message, false);
+                } else {
+                    showAlert("Student updated successfully!", true);
+                    resetForm();
+                    loadStudents();
+                }
+            } else {
+                // Insert New Student
+                const { error } = await db
+                    .from('std_management_system')
+                    .insert([{ name: name, email: email, course: course }]);
+
+                if (error) {
+                    showAlert("Failed to add student: " + error.message, false);
+                } else {
+                    showAlert("Student added successfully!", true);
+                    resetForm();
+                    loadStudents();
+                }
+            }
+        });
+
+        // Edit Button Click (Fills form)
+        function editStudent(id, name, email, course) {
+            document.getElementById('student-id').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('email').value = email;
+            document.getElementById('course').value = course;
+
+            document.getElementById('form-title').innerText = "Edit Student";
+            document.getElementById('btn-save').innerText = "Update Student";
+            document.getElementById('btn-cancel').style.display = "inline-block";
+        }
+
+        // Delete confirmation
+        function confirmDelete(id) {
+            deleteId = id;
+            document.getElementById('delete-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            deleteId = null;
+            document.getElementById('delete-modal').style.display = 'none';
+        }
+
+        // Delete operation
+        async function deleteStudent() {
+            if (!deleteId) return;
+
+            const { error } = await db
+                .from('std_management_system')
+                .delete()
+                .eq('id', deleteId);
+
+            closeModal();
+
+            if (error) {
+                showAlert("Failed to delete: " + error.message, false);
+            } else {
+                showAlert("Student deleted successfully!", true);
+                loadStudents();
+            }
+        }
+
+        // Reset form to default state
+        function resetForm() {
+            document.getElementById('student-id').value = '';
+            document.getElementById('student-form').reset();
+            document.getElementById('form-title').innerText = "Add Student";
+            document.getElementById('btn-save').innerText = "Save Student";
+            document.getElementById('btn-cancel').style.display = "none";
+        }
+
+        // Simple alert banner function
+        function showAlert(message, isSuccess) {
+            const alert = document.getElementById('alert');
+            alert.innerText = message;
+            alert.className = isSuccess ? "alert-box alert-success" : "alert-box alert-error";
+            alert.style.display = "block";
+
+            setTimeout(function () {
+                alert.style.display = "none";
+            }, 3000);
+        }
+    </script>
+</body>
+
+</html>
